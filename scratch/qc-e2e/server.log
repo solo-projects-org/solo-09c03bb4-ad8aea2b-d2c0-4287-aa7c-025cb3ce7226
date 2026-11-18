@@ -1,0 +1,71 @@
+INFO:     Uvicorn running on http://127.0.0.1:8078 (Press CTRL+C to quit)
+INFO:     Started parent process [842]
+INFO:     Started server process [844]
+INFO:     Started server process [845]
+INFO:     Waiting for application startup.
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:33330 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33340 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51612 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51624 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51630 - "POST /scenes/SCENE_OK/revisions HTTP/1.1" 201 Created
+INFO:     127.0.0.1:51638 - "GET /scenes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51644 - "POST /scenes/SCENE_OK/qc HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:51658 - "GET /scenes/SCENE_OK/qc HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51668 - "GET /scenes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51676 - "POST /scenes/SCENE_SHIFT/revisions HTTP/1.1" 201 Created
+INFO:     127.0.0.1:51688 - "POST /scenes/SCENE_SHIFT/qc HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:51692 - "GET /scenes/SCENE_SHIFT/qc HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51708 - "GET /scenes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51714 - "GET /scenes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51728 - "GET /scenes/SCENE_SHIFT/revisions/1/bands/B04/download HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51744 - "POST /scenes/SCENE_GRID/revisions HTTP/1.1" 201 Created
+INFO:     127.0.0.1:51748 - "POST /scenes/SCENE_GRID/qc HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:51760 - "GET /scenes/SCENE_GRID/qc HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51766 - "POST /scenes/SCENE_PLAIN/revisions HTTP/1.1" 201 Created
+/workspace/.venv/lib/python3.11/site-packages/fastapi/telemetry/_api.py:244: StarletteDeprecationWarning: 'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated. Use 'HTTP_422_UNPROCESSABLE_CONTENT' instead.
+  return function(**arguments)
+INFO:     127.0.0.1:51770 - "POST /scenes/SCENE_PLAIN/qc HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:51784 - "GET /scenes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51792 - "GET /scenes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51804 - "GET /scenes/SCENE_PLAIN/qc HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51818 - "POST /scenes/SCENE_EVO/revisions HTTP/1.1" 201 Created
+INFO:     127.0.0.1:51820 - "POST /scenes/SCENE_EVO/qc HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:51834 - "GET /scenes/SCENE_EVO/qc HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51836 - "GET /scenes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51850 - "GET /scenes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51858 - "POST /scenes/SCENE_EVO/revisions HTTP/1.1" 201 Created
+INFO:     127.0.0.1:51870 - "GET /scenes/SCENE_EVO/qc HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51876 - "GET /scenes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51878 - "GET /scenes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51892 - "GET /scenes/SCENE_EVO/revisions/1/bands/B08/download HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51906 - "POST /scenes/SCENE_EVO/qc HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:51910 - "GET /scenes/SCENE_EVO/qc HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51920 - "GET /scenes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51922 - "GET /scenes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51936 - "POST /scenes/SCENE_LATE/revisions HTTP/1.1" 201 Created
+INFO:     127.0.0.1:51948 - "POST /scenes/SCENE_LATE/qc HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:51960 - "POST /scenes/SCENE_LATE/revisions HTTP/1.1" 201 Created
+INFO:     127.0.0.1:51964 - "GET /scenes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51972 - "GET /scenes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51988 - "POST /scenes/SCENE_LATE/qc HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:51990 - "GET /scenes/SCENE_LATE/qc HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52002 - "GET /scenes/SCENE_LATE/qc HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52018 - "GET /scenes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52034 - "GET /scenes HTTP/1.1" 200 OK
+INFO:     Received SIGTERM, exiting.
+INFO:     Terminated child process [844]
+INFO:     Terminated child process [845]
+INFO:     Waiting for child process [844]
+INFO:     Shutting down
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [845]
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [844]
+INFO:     Waiting for child process [845]
+INFO:     Stopping parent process [842]

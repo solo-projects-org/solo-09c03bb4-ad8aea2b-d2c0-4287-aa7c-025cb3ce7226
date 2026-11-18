@@ -40,6 +40,24 @@ CREATE TABLE IF NOT EXISTS bands (
     PRIMARY KEY (scene_id, revision, band),
     FOREIGN KEY (scene_id, revision) REFERENCES scenes(scene_id, revision)
 ) WITHOUT ROWID;
+
+-- Spatial quality control verdicts, one row per (scene, revision).
+-- A scene becomes QC-gated the moment its first row appears (i.e. the first
+-- time a QC run is started); from then on /scenes only lists it while the
+-- CURRENT revision's row says 'approved'. Rows are created as 'pending' and
+-- only ever move to a final verdict via the background worker's UPDATE, so a
+-- crash or a failed UPDATE leaves the revision 'pending'.
+CREATE TABLE IF NOT EXISTS qc_results (
+    scene_id        TEXT NOT NULL,
+    revision        INTEGER NOT NULL,
+    status          TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'rejected')),
+    reasons         TEXT NOT NULL DEFAULT '[]',  -- JSON array of mismatch reasons
+    started_at      TEXT,                        -- UTC ISO-8601; NULL if never run
+    finished_at     TEXT,                        -- UTC ISO-8601; NULL while pending
+    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    PRIMARY KEY (scene_id, revision),
+    FOREIGN KEY (scene_id, revision) REFERENCES scenes(scene_id, revision)
+) WITHOUT ROWID;
 """
 
 

@@ -1,0 +1,27 @@
+INFO:     Uvicorn running on http://127.0.0.1:8078 (Press CTRL+C to quit)
+INFO:     Started parent process [887]
+INFO:     Started server process [890]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Started server process [889]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:52578 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52590 - "GET /scenes/SCENE_OK/qc HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52594 - "GET /scenes/SCENE_SHIFT/qc HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52610 - "GET /scenes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52620 - "GET /scenes/SCENE_EVO/revisions/1/bands/B04/download HTTP/1.1" 200 OK
+INFO:     Received SIGTERM, exiting.
+INFO:     Terminated child process [889]
+INFO:     Terminated child process [890]
+INFO:     Waiting for child process [889]
+INFO:     Shutting down
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [890]
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [889]
+INFO:     Waiting for child process [890]
+INFO:     Stopping parent process [887]

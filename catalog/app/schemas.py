@@ -45,3 +45,23 @@ class SceneSummary(BaseModel):
 class HealthOut(BaseModel):
     status: Literal["ok"]
     database: Literal["ok"]
+
+
+class QCOut(BaseModel):
+    """Spatial QC state of one revision (always the current one via the API)."""
+
+    scene_id: str
+    revision: int
+    status: Literal["pending", "approved", "rejected"] = Field(
+        description="pending = 待检 (check not completed); "
+        "approved = 通过 (grids and registered rectangle match); "
+        "rejected = 不符 (see reasons)"
+    )
+    reasons: list[str] = Field(
+        description="Mismatch reasons found by the check; empty when approved or still pending"
+    )
+    started_at: Optional[str] = Field(default=None, description="UTC time the last run started")
+    finished_at: Optional[str] = Field(default=None, description="UTC time the verdict was stored")
+    detail: Optional[str] = Field(
+        default=None, description="Extra information, only set by the POST that starts QC"
+    )

@@ -1,6 +1,7 @@
 """FastAPI application: scene revision catalog with verified band files."""
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
 from contextlib import asynccontextmanager
@@ -19,10 +20,10 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse, RedirectResponse, Response
 
-from . import storage
+from . import qc, storage
 from .config import Settings, get_settings
 from .db import check_db_alive, get_conn, init_db
-from .schemas import BandOut, HealthOut, RevisionOut, SceneSummary
+from .schemas import BandOut, HealthOut, QCOut, RevisionOut, SceneSummary
 
 _SCENE_ID_RE = re.compile(r"^[A-Za-z0-9_.\-]{1,128}$")
 _BANDS = ("B04", "B08")
@@ -145,11 +146,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Satellite Scene Catalog API",
-    version="1.0.0",
+    version="1.1.0",
     description=(
         "Catalog of satellite scene revisions (B04 red and B08 NIR bands). "
         "A revision becomes queryable only after BOTH band files have been "
-        "verified against their declared SHA-256 digests."
+        "verified against their declared SHA-256 digests. Once spatial QC has "
+        "been started for a scene, the scene is listed by /scenes only while "
+        "its current revision has passed QC (EPSG:4326 north-up single-band "
+        "GeoTIFFs whose grids and registered rectangle match the image bounds)."
     ),
     lifespan=lifespan,
 )
@@ -302,6 +306,19 @@ def submit_revision(
             "VALUES (?, ?, 'B08', ?, ?, ?)",
             (scene_id, revision, stored_b08.sha256, stored_b08.size_bytes, stored_b08.stored_path),
         )
+        # Once spatial QC has been started for a scene, every NEW revision
+        # reverts to 'pending': it must pass QC before the scene is listed by
+        # /scenes again. (Idempotent replays above never reach this branch and
+        # therefore keep the existing QC state.)
+        gated = conn.execute(
+            "SELECT 1 FROM qc_results WHERE scene_id = ? LIMIT 1", (scene_id,)
+        ).fetchone()
+        if gated:
+            conn.execute(
+                "INSERT INTO qc_results (scene_id, revision, status) "
+                "VALUES (?, ?, 'pending')",
+                (scene_id, revision),
+            )
         conn.commit()
 
         scene_row = conn.execute(
@@ -336,7 +353,9 @@ def query_scenes(
     acquisition time intersect the given lon/lat rectangle and UTC time window.
 
     Only scenes with both verified bands are ever present, so every result
-    carries B04 and B08 download URLs.
+    carries B04 and B08 download URLs. Once spatial QC has been started for a
+    scene, the scene is listed only while its current revision has APPROVED QC;
+    scenes that never started QC are listed as before.
     """
     settings = get_settings()
     bbox_values = [west, south, east, north]
@@ -361,11 +380,16 @@ def query_scenes(
             GROUP BY scene_id
         ) latest
           ON latest.scene_id = s.scene_id AND latest.revision = s.revision
+        LEFT JOIN qc_results q
+          ON q.scene_id = s.scene_id AND q.revision = s.revision
         WHERE (:has_bbox = 0
                OR (s.west <= :east AND s.east >= :west
                    AND s.south <= :north AND s.north >= :south))
           AND (:start IS NULL OR s.acquisition_time >= :start)
           AND (:end IS NULL OR s.acquisition_time <= :end)
+          -- QC gate: active for a scene from its first QC run onwards.
+          AND (NOT EXISTS (SELECT 1 FROM qc_results g WHERE g.scene_id = s.scene_id)
+               OR q.status = 'approved')
         ORDER BY s.scene_id
         """,
         {
@@ -415,6 +439,142 @@ def get_revision(
     if row is None:
         raise HTTPException(404, f"scene {scene_id} revision {revision} not found")
     return _revision_out(request, settings, conn, row, None)
+
+
+# --------------------------------------------------------------------------- #
+# Spatial quality control
+# --------------------------------------------------------------------------- #
+def _qc_out(scene_id: str, revision: int, row: sqlite3.Row, detail: Optional[str] = None) -> QCOut:
+    return QCOut(
+        scene_id=scene_id,
+        revision=revision,
+        status=row["status"],
+        reasons=json.loads(row["reasons"]),
+        started_at=row["started_at"],
+        finished_at=row["finished_at"],
+        detail=detail,
+    )
+
+
+def _current_scene_row(conn: sqlite3.Connection, scene_id: str) -> Optional[sqlite3.Row]:
+    return conn.execute(
+        "SELECT * FROM scenes WHERE scene_id = ? ORDER BY revision DESC LIMIT 1",
+        (scene_id,),
+    ).fetchone()
+
+
+@app.post(
+    "/scenes/{scene_id}/qc",
+    response_model=QCOut,
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["qc"],
+    responses={
+        404: {"description": "Scene not found"},
+        422: {"description": "Band files of the current revision are not GeoTIFFs"},
+    },
+)
+def start_spatial_qc(
+    scene_id: str,
+    conn: Annotated[sqlite3.Connection, Depends(db_conn)],
+):
+    """Start a spatial QC run for the CURRENT revision of a scene.
+
+    The B04/B08 files must be single-band GeoTIFFs on an EPSG:4326, north-up
+    grid; the check compares the two band grids and the registered rectangle
+    against the image bounds and reports every mismatch. The check runs in the
+    background (other scenes remain fully usable meanwhile); poll
+    `GET /scenes/{scene_id}/qc` for the verdict.
+
+    From the first QC start onwards the scene is QC-gated: it appears in
+    `/scenes` only while its current revision is approved. Plain (non-GeoTIFF)
+    band files are refused with 422 and do NOT start QC (the scene keeps its
+    previous behavior).
+    """
+    settings = get_settings()
+    scene_id = _validate_scene_id(scene_id)
+
+    # Serialize with concurrent submissions/QC-starts so the revision that is
+    # checked is unambiguously the current one at this instant.
+    conn.execute("BEGIN IMMEDIATE")
+    scene = _current_scene_row(conn, scene_id)
+    if scene is None:
+        raise HTTPException(404, f"scene {scene_id} not found")
+    revision = scene["revision"]
+
+    band_rows = conn.execute(
+        "SELECT band, stored_path FROM bands WHERE scene_id = ? AND revision = ?",
+        (scene_id, revision),
+    ).fetchall()
+    paths = {row["band"]: storage.band_path(settings, row["stored_path"]) for row in band_rows}
+
+    # Refuse plain files: QC only supports GeoTIFF bands. No state is changed.
+    refusals = {
+        band: reason
+        for band in _BANDS
+        if (reason := qc.precheck_geotiff(paths[band])) is not None
+    }
+    if refusals:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "spatial QC requires GeoTIFF band files; refused to start: "
+                + "; ".join(f"{band}: {why}" for band, why in sorted(refusals.items()))
+            ),
+        )
+
+    # (Re-)arm the revision as pending. This row existing is what QC-gates the
+    # scene; the verdict arrives asynchronously via the background worker.
+    now = datetime.now(timezone.utc).strftime(_TS_FMT)
+    conn.execute(
+        "INSERT INTO qc_results (scene_id, revision, status, reasons, started_at, finished_at) "
+        "VALUES (?, ?, 'pending', '[]', ?, NULL) "
+        "ON CONFLICT (scene_id, revision) DO UPDATE SET "
+        "status = 'pending', reasons = '[]', started_at = excluded.started_at, "
+        "finished_at = NULL",
+        (scene_id, revision, now),
+    )
+    conn.commit()
+
+    bbox = (scene["west"], scene["south"], scene["east"], scene["north"])
+    launched = qc.launch(scene_id, revision, settings.db_path, paths["B04"], paths["B08"], bbox)
+    row = conn.execute(
+        "SELECT * FROM qc_results WHERE scene_id = ? AND revision = ?",
+        (scene_id, revision),
+    ).fetchone()
+    return _qc_out(
+        scene_id,
+        revision,
+        row,
+        detail="qc started" if launched else "qc already in progress for this revision",
+    )
+
+
+@app.get(
+    "/scenes/{scene_id}/qc",
+    response_model=QCOut,
+    tags=["qc"],
+    responses={404: {"description": "Scene not found, or QC never started for it"}},
+)
+def get_spatial_qc(
+    scene_id: str,
+    conn: Annotated[sqlite3.Connection, Depends(db_conn)],
+):
+    """Return the QC state of the CURRENT revision of a scene."""
+    scene_id = _validate_scene_id(scene_id)
+    scene = _current_scene_row(conn, scene_id)
+    if scene is None:
+        raise HTTPException(404, f"scene {scene_id} not found")
+    row = conn.execute(
+        "SELECT * FROM qc_results WHERE scene_id = ? AND revision = ?",
+        (scene_id, scene["revision"]),
+    ).fetchone()
+    if row is None:
+        raise HTTPException(
+            404,
+            f"spatial QC has not been started for scene {scene_id} "
+            f"(current revision {scene['revision']})",
+        )
+    return _qc_out(scene_id, scene["revision"], row)
 
 
 @app.get(
